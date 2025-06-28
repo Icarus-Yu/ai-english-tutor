@@ -41,3 +41,10 @@ yarn-error.log*
 /playwright-report/
 /blob-report/
 /playwright/*
+# pnpm-specific files
+.pnpm-store/
+.pnpm-state.json
+.pnpm-debug.log
+# Source map files
+*.map
+**/*.map
