@@ -26,6 +26,7 @@ export const chat = pgTable('Chat', {
   userId: uuid('userId')
     .notNull()
     .references(() => user.id),
+  bookId: uuid('bookId').references(() => book.id), // 书本ID
   visibility: varchar('visibility', { enum: ['public', 'private'] })
     .notNull()
     .default('private'),
@@ -168,3 +169,13 @@ export const stream = pgTable(
 );
 
 export type Stream = InferSelectModel<typeof stream>;
+
+export const book = pgTable('Book', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  title: text('title').notNull(),
+  author: text('author'),
+  coverImageUrl: text('coverImageUrl'),
+  content: text('content').notNull(),
+});
+
+export type Book = InferSelectModel<typeof book>;
