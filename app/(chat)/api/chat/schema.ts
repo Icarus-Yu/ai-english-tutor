@@ -23,7 +23,11 @@ export const postRequestBodySchema = z.object({
       )
       .optional(),
   }),
-  selectedChatModel: z.enum(['chat-model', 'chat-model-reasoning']),
+  selectedChatModel: z.enum([
+    'chat-model',
+    'chat-model-reasoning',
+    'spark-4.0-ultra',
+  ]),
   selectedVisibilityType: z.enum(['public', 'private']),
 });
 

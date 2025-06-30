@@ -49,15 +49,12 @@ function getStreamContext() {
       });
     } catch (error: any) {
       if (error.message.includes('REDIS_URL')) {
-        console.log(
-          ' > Resumable streams are disabled due to missing REDIS_URL',
-        );
+        console.log(' > Resumable streams are disabled due to missing REDIS_URL');
       } else {
         console.error(error);
       }
     }
   }
-
   return globalStreamContext;
 }
 
@@ -72,8 +69,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { id, message, selectedChatModel, selectedVisibilityType } =
-      requestBody;
+    const { id, message, selectedChatModel, selectedVisibilityType } = requestBody;
 
     const session = await auth();
 
@@ -95,9 +91,7 @@ export async function POST(request: Request) {
     const chat = await getChatById({ id });
 
     if (!chat) {
-      const title = await generateTitleFromUserMessage({
-        message,
-      });
+      const title = await generateTitleFromUserMessage({ message });
 
       await saveChat({
         id,
@@ -121,12 +115,7 @@ export async function POST(request: Request) {
 
     const { longitude, latitude, city, country } = geolocation(request);
 
-    const requestHints: RequestHints = {
-      longitude,
-      latitude,
-      city,
-      country,
-    };
+    const requestHints: RequestHints = { longitude, latitude, city, country };
 
     await saveMessages({
       messages: [
@@ -154,22 +143,14 @@ export async function POST(request: Request) {
           experimental_activeTools:
             selectedChatModel === 'chat-model-reasoning'
               ? []
-              : [
-                  'getWeather',
-                  'createDocument',
-                  'updateDocument',
-                  'requestSuggestions',
-                ],
+              : ['getWeather', 'createDocument', 'updateDocument', 'requestSuggestions'],
           experimental_transform: smoothStream({ chunking: 'word' }),
           experimental_generateMessageId: generateUUID,
           tools: {
             getWeather,
             createDocument: createDocument({ session, dataStream }),
             updateDocument: updateDocument({ session, dataStream }),
-            requestSuggestions: requestSuggestions({
-              session,
-              dataStream,
-            }),
+            requestSuggestions: requestSuggestions({ session, dataStream }),
           },
           onFinish: async ({ response }) => {
             if (session.user?.id) {
@@ -196,8 +177,7 @@ export async function POST(request: Request) {
                       chatId: id,
                       role: assistantMessage.role,
                       parts: assistantMessage.parts,
-                      attachments:
-                        assistantMessage.experimental_attachments ?? [],
+                      attachments: assistantMessage.experimental_attachments ?? [],
                       createdAt: new Date(),
                     },
                   ],
@@ -214,10 +194,7 @@ export async function POST(request: Request) {
         });
 
         result.consumeStream();
-
-        result.mergeIntoDataStream(dataStream, {
-          sendReasoning: true,
-        });
+        result.mergeIntoDataStream(dataStream, { sendReasoning: true });
       },
       onError: () => {
         return 'Oops, an error occurred!';
@@ -237,6 +214,9 @@ export async function POST(request: Request) {
     if (error instanceof ChatSDKError) {
       return error.toResponse();
     }
+
+    console.error('Unexpected error in POST /api/chat:', error);
+    return new Response('Internal Server Error', { status: 500 });
   }
 }
 
@@ -298,10 +278,6 @@ export async function GET(request: Request) {
     () => emptyDataStream,
   );
 
-  /*
-   * For when the generation is streaming during SSR
-   * but the resumable stream has concluded at this point.
-   */
   if (!stream) {
     const messages = await getMessagesByChatId({ id: chatId });
     const mostRecentMessage = messages.at(-1);

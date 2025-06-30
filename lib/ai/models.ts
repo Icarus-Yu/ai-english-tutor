@@ -17,4 +17,9 @@ export const chatModels: Array<ChatModel> = [
     name: 'Reasoning model',
     description: 'Uses advanced reasoning',
   },
+  {
+    id: 'spark-4.0-ultra',
+    name: 'Spark 4.0 Ultra',
+    description: 'Xunfei Spark 4.0 Ultra Model',
+  },
 ];
