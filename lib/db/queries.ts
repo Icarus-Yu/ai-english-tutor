@@ -26,6 +26,7 @@ import {
   vote,
   type DBMessage,
   type Chat,
+  book,
   stream,
 } from './schema';
 import type { ArtifactKind } from '@/components/artifact';
@@ -85,11 +86,13 @@ export async function saveChat({
   userId,
   title,
   visibility,
+  bookId,
 }: {
   id: string;
   userId: string;
   title: string;
   visibility: VisibilityType;
+  bookId?: string;
 }) {
   try {
     return await db.insert(chat).values({
@@ -98,6 +101,7 @@ export async function saveChat({
       userId,
       title,
       visibility,
+      bookId,
     });
   } catch (error) {
     throw new ChatSDKError('bad_request:database', 'Failed to save chat');
@@ -534,5 +538,20 @@ export async function getStreamIdsByChatId({ chatId }: { chatId: string }) {
       'bad_request:database',
       'Failed to get stream ids by chat id',
     );
+  }
+}
+export async function getBooks() {
+  try {
+    return await db.select().from(book);
+  } catch (error) {
+    throw new ChatSDKError('bad_request:database', 'Failed to get books');
+  }
+}
+export async function getBookById({ id }: { id: string }) {
+  try {
+    const [selectedBook] = await db.select().from(book).where(eq(book.id, id));
+    return selectedBook;
+  } catch (error) {
+    throw new ChatSDKError('bad_request:database', 'Failed to get book by id');
   }
 }

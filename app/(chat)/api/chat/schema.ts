@@ -29,6 +29,7 @@ export const postRequestBodySchema = z.object({
     'spark-4.0-ultra',
   ]),
   selectedVisibilityType: z.enum(['public', 'private']),
+ bookId: z.string().uuid(),
 });
 
 export type PostRequestBody = z.infer<typeof postRequestBodySchema>;

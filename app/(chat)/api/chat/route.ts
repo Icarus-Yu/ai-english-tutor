@@ -16,6 +16,7 @@ import {
   getStreamIdsByChatId,
   saveChat,
   saveMessages,
+  getBookById
 } from '@/lib/db/queries';
 import { generateUUID, getTrailingMessageId } from '@/lib/utils';
 import { generateTitleFromUserMessage } from '../../actions';
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { id, message, selectedChatModel, selectedVisibilityType } = requestBody;
+    const { id, message, selectedChatModel, selectedVisibilityType, bookId } = requestBody;
 
     const session = await auth();
 
@@ -88,7 +89,7 @@ export async function POST(request: Request) {
       return new ChatSDKError('rate_limit:chat').toResponse();
     }
 
-    const chat = await getChatById({ id });
+    let chat = await getChatById({ id });
 
     if (!chat) {
       const title = await generateTitleFromUserMessage({ message });
@@ -98,7 +99,9 @@ export async function POST(request: Request) {
         userId: session.user.id,
         title,
         visibility: selectedVisibilityType,
+        bookId,
       });
+      chat = await getChatById({ id });
     } else {
       if (chat.userId !== session.user.id) {
         return new ChatSDKError('forbidden:chat').toResponse();
@@ -130,6 +133,15 @@ export async function POST(request: Request) {
       ],
     });
 
+    let finalSystemPrompt = systemPrompt({ selectedChatModel, requestHints });
+
+    if (chat?.bookId) {
+        const book = await getBookById({ id: chat.bookId });
+        if (book) {
+            finalSystemPrompt = `You are an English tutor. The user has selected the book titled "${book.title}". Your conversation must be based on the content of this book. Be friendly and engaging. Ask the user questions about the content to test their understanding. Correct their grammar and provide better ways to phrase their sentences. Here is the book content for your reference:\n\n---\n\n${book.content}\n\n---\n\n${finalSystemPrompt}`;
+        }
+    }
+
     const streamId = generateUUID();
     await createStreamId({ streamId, chatId: id });
 
@@ -137,7 +149,7 @@ export async function POST(request: Request) {
       execute: (dataStream) => {
         const result = streamText({
           model: myProvider.languageModel(selectedChatModel),
-          system: systemPrompt({ selectedChatModel, requestHints }),
+          system: finalSystemPrompt,
           messages,
           maxSteps: 5,
           experimental_activeTools:
