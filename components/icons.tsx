@@ -1172,3 +1172,19 @@ export const WarningIcon = ({ size = 16 }: { size?: number }) => {
     </svg>
   );
 };
+export const MicrophoneIcon = ({ size = 16 }: { size?: number }) => (
+  <svg
+    height={size}
+    strokeLinejoin="round"
+    viewBox="0 0 16 16"
+    width={size}
+    style={{ color: 'currentcolor' }}
+  >
+    <path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M8 1.5C6.89543 1.5 6 2.39543 6 3.5V8.5C6 9.60457 6.89543 10.5 8 10.5C9.10457 10.5 10 9.60457 10 8.5V3.5C10 2.39543 9.10457 1.5 8 1.5ZM4.5 3.5C4.5 1.567 6.067 0 8 0C9.933 0 11.5 1.567 11.5 3.5V8.5C11.5 10.433 9.933 12 8 12C6.067 12 4.5 10.433 4.5 8.5V3.5ZM3.5 8V8.5C3.5 11 5.5 13 8 13C10.5 13 12.5 11 12.5 8.5V8H14V8.5C14 11.3217 11.8596 13.595 9.25 13.9472V15.25V16H6.75V15.25V13.9472C4.14036 13.595 2 11.3217 2 8.5V8H3.5Z"
+      fill="currentColor"
+    ></path>
+  </svg>
+);

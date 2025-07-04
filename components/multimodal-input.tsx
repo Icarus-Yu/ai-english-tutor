@@ -16,7 +16,8 @@ import {
 import { toast } from 'sonner';
 import { useLocalStorage, useWindowSize } from 'usehooks-ts';
 
-import { ArrowUpIcon, PaperclipIcon, StopIcon } from './icons';
+// 1. 导入我们刚刚创建的麦克风图标
+import { ArrowUpIcon, MicrophoneIcon, PaperclipIcon, StopIcon } from './icons';
 import { PreviewAttachment } from './preview-attachment';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
@@ -27,6 +28,14 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowDown } from 'lucide-react';
 import { useScrollToBottom } from '@/hooks/use-scroll-to-bottom';
 import type { VisibilityType } from './visibility-selector';
+
+// 2. 定义对话状态类型
+type DialogueState =
+  | 'idle'
+  | 'recording'
+  | 'transcribing'
+  | 'thinking'
+  | 'speaking';
 
 function PureMultimodalInput({
   chatId,
@@ -59,6 +68,10 @@ function PureMultimodalInput({
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  // 3. 创建用于管理语音交互流程的状态
+  const [dialogueState, setDialogueState] = useState<DialogueState>('idle');
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -88,13 +101,10 @@ function PureMultimodalInput({
   useEffect(() => {
     if (textareaRef.current) {
       const domValue = textareaRef.current.value;
-      // Prefer DOM value over localStorage to handle hydration
       const finalValue = domValue || localStorageInput || '';
       setInput(finalValue);
       adjustHeight();
     }
-    // Only run once after hydration
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -131,6 +141,54 @@ function PureMultimodalInput({
     width,
     chatId,
   ]);
+
+  // 4. 定义麦克风按钮的点击事件处理函数
+  const handleMicClick = () => {
+    if (dialogueState === 'idle') {
+      // --- 开始录音的逻辑 ---
+      navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then((stream) => {
+          const newMediaRecorder = new MediaRecorder(stream);
+          mediaRecorderRef.current = newMediaRecorder;
+          audioChunksRef.current = []; // 清空之前的录音数据
+
+          newMediaRecorder.ondataavailable = (event) => {
+            audioChunksRef.current.push(event.data);
+          };
+
+          newMediaRecorder.onstart = () => {
+            setDialogueState('recording');
+            console.log("MediaRecorder started, state set to 'recording'");
+          };
+
+          newMediaRecorder.start();
+        })
+        .catch((err) => {
+          console.error('Error accessing microphone:', err);
+          toast({
+            type: 'error',
+            description:
+              'Could not access microphone. Please check permissions.',
+          });
+        });
+    } else if (dialogueState === 'recording') {
+      // --- 停止录音的逻辑 ---
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.onstop = () => {
+          // 在这里我们将处理并发送音频，但现在先重置状态
+          const audioBlob = new Blob(audioChunksRef.current, {
+            type: 'audio/webm',
+          });
+          console.log('Recording stopped, audio blob created:', audioBlob);
+          // TODO: 将 audioBlob 发送到 Python 语音服务
+
+          setDialogueState('idle'); // 暂时先重置回 idle
+        };
+        mediaRecorderRef.current.stop();
+      }
+    }
+  };
 
   const uploadFile = async (file: File) => {
     const formData = new FormData();
@@ -192,6 +250,9 @@ function PureMultimodalInput({
       scrollToBottom();
     }
   }, [status, scrollToBottom]);
+
+  // 5. 根据 dialogueState 判断是否正在录音
+  const isRecording = dialogueState === 'recording';
 
   return (
     <div className="relative w-full flex flex-col gap-4">
@@ -265,7 +326,8 @@ function PureMultimodalInput({
       <Textarea
         data-testid="multimodal-input"
         ref={textareaRef}
-        placeholder="Send a message..."
+        // 6. 录音时禁用文本框并显示提示
+        placeholder={isRecording ? 'Recording...' : 'Send a message...'}
         value={input}
         onChange={handleInput}
         className={cx(
@@ -274,6 +336,7 @@ function PureMultimodalInput({
         )}
         rows={2}
         autoFocus
+        disabled={isRecording}
         onKeyDown={(event) => {
           if (
             event.key === 'Enter' &&
@@ -295,7 +358,22 @@ function PureMultimodalInput({
         <AttachmentsButton fileInputRef={fileInputRef} status={status} />
       </div>
 
-      <div className="absolute bottom-0 right-0 p-2 w-fit flex flex-row justify-end">
+      <div className="absolute bottom-0 right-0 p-2 w-fit flex flex-row items-center gap-2">
+        {/* 7. 添加麦克风按钮 */}
+        <Button
+          type="button"
+          className={cx(
+            'rounded-full p-1.5 h-fit border dark:border-zinc-600',
+            {
+              'bg-red-500 hover:bg-red-600 text-white': isRecording,
+            },
+          )}
+          onClick={handleMicClick}
+          disabled={status !== 'ready' && !isRecording}
+        >
+          {isRecording ? <StopIcon size={14} /> : <MicrophoneIcon size={14} />}
+        </Button>
+
         {status === 'submitted' ? (
           <StopButton stop={stop} setMessages={setMessages} />
         ) : (
@@ -303,6 +381,8 @@ function PureMultimodalInput({
             input={input}
             submitForm={submitForm}
             uploadQueue={uploadQueue}
+            // 8. 录音时禁用发送按钮
+            disabled={isRecording}
           />
         )}
       </div>
@@ -318,6 +398,8 @@ export const MultimodalInput = memo(
     if (!equal(prevProps.attachments, nextProps.attachments)) return false;
     if (prevProps.selectedVisibilityType !== nextProps.selectedVisibilityType)
       return false;
+    // 9. 添加新状态的比较，防止不必要的重渲染
+    if (prevProps.dialogueState !== nextProps.dialogueState) return false;
 
     return true;
   },
@@ -376,10 +458,12 @@ function PureSendButton({
   submitForm,
   input,
   uploadQueue,
+  disabled, // 10. 接收 disabled 属性
 }: {
   submitForm: () => void;
   input: string;
   uploadQueue: Array<string>;
+  disabled: boolean;
 }) {
   return (
     <Button
@@ -389,7 +473,7 @@ function PureSendButton({
         event.preventDefault();
         submitForm();
       }}
-      disabled={input.length === 0 || uploadQueue.length > 0}
+      disabled={disabled || input.length === 0 || uploadQueue.length > 0}
     >
       <ArrowUpIcon size={14} />
     </Button>
@@ -400,5 +484,6 @@ const SendButton = memo(PureSendButton, (prevProps, nextProps) => {
   if (prevProps.uploadQueue.length !== nextProps.uploadQueue.length)
     return false;
   if (prevProps.input !== nextProps.input) return false;
+  if (prevProps.disabled !== nextProps.disabled) return false; // 11. 比较 disabled 属性
   return true;
 });
