@@ -1,0 +1,9 @@
+pnpm db:studio// Open Prisma Studio
+pnpm de:migration// Create a new migration
+pnpm dev// Start the development server
+pnpm lint// Lint the code
+pnpm lint:fix// Fix lint errors
+pnpm test// Run tests
+pnpm test:watch// Run tests in watch mode
+pnpm typecheck// Check TypeScript types
+pnpm typecheck:watch// Check TypeScript types in watch mode

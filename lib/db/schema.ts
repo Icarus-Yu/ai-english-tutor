@@ -9,7 +9,9 @@ import {
   primaryKey,
   foreignKey,
   boolean,
+  integer,
 } from 'drizzle-orm/pg-core';
+import { pgvector } from 'pgvector/drizzle-orm'; // 导入pgvector,用于书本向量的索引
 
 export const user = pgTable('User', {
   id: uuid('id').primaryKey().notNull().defaultRandom(),
@@ -179,3 +181,10 @@ export const book = pgTable('Book', {
 });
 
 export type Book = InferSelectModel<typeof book>;
+export const bookChunks = pgTable('book_chunks', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  bookId: uuid('bookId').references(() => book.id, { onDelete: 'cascade' }),
+  chunkNumber: integer('chunk_number').notNull(),
+  chunkText: text('chunk_text').notNull(),
+  embedding: pgvector('embedding', { dimensions: 1024 }).notNull(), // 假设使用1024维度的模型
+});
