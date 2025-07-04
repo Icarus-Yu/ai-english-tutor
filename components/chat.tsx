@@ -39,6 +39,8 @@ export function Chat({
   autoResume: boolean;
 }) {
   const { mutate } = useSWRConfig();
+  const searchParams = useSearchParams();
+  const bookId = searchParams.get('bookId');
 
   const { visibilityType } = useChatVisibility({
     chatId: id,
@@ -60,6 +62,10 @@ export function Chat({
   } = useChat({
     id,
     initialMessages,
+    body: {
+      // <--- 核心修改在这里
+      bookId: bookId ?? undefined,
+    },
     experimental_throttle: 100,
     sendExtraMessageFields: true,
     generateId: generateUUID,
@@ -69,6 +75,7 @@ export function Chat({
       message: body.messages.at(-1),
       selectedChatModel: initialChatModel,
       selectedVisibilityType: visibilityType,
+      bookId: bookId ?? undefined, // 我们在这里也保留它，以确保万无一失
     }),
     onFinish: () => {
       mutate(unstable_serialize(getChatHistoryPaginationKey));
@@ -83,7 +90,6 @@ export function Chat({
     },
   });
 
-  const searchParams = useSearchParams();
   const query = searchParams.get('query');
 
   const [hasAppendedQuery, setHasAppendedQuery] = useState(false);
@@ -96,9 +102,10 @@ export function Chat({
       });
 
       setHasAppendedQuery(true);
-      window.history.replaceState({}, '', `/chat/${id}`);
+      const newUrl = bookId ? `/chat/${id}?bookId=${bookId}` : `/chat/${id}`;
+      window.history.replaceState({}, '', newUrl);
     }
-  }, [query, append, hasAppendedQuery, id]);
+  }, [query, append, hasAppendedQuery, id, bookId]);
 
   const { data: votes } = useSWR<Array<Vote>>(
     messages.length >= 2 ? `/api/vote?chatId=${id}` : null,

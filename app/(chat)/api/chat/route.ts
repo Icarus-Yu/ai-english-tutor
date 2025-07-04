@@ -16,7 +16,7 @@ import {
   getStreamIdsByChatId,
   saveChat,
   saveMessages,
-  getBookById
+  getBookById,
 } from '@/lib/db/queries';
 import { generateUUID, getTrailingMessageId } from '@/lib/utils';
 import { generateTitleFromUserMessage } from '../../actions';
@@ -50,7 +50,9 @@ function getStreamContext() {
       });
     } catch (error: any) {
       if (error.message.includes('REDIS_URL')) {
-        console.log(' > Resumable streams are disabled due to missing REDIS_URL');
+        console.log(
+          ' > Resumable streams are disabled due to missing REDIS_URL',
+        );
       } else {
         console.error(error);
       }
@@ -70,7 +72,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { id, message, selectedChatModel, selectedVisibilityType, bookId } = requestBody;
+    // 关键修复：在这里解构出 bookId
+    const { id, message, selectedChatModel, selectedVisibilityType, bookId } =
+      requestBody;
 
     const session = await auth();
 
@@ -117,7 +121,6 @@ export async function POST(request: Request) {
     });
 
     const { longitude, latitude, city, country } = geolocation(request);
-
     const requestHints: RequestHints = { longitude, latitude, city, country };
 
     await saveMessages({
@@ -136,10 +139,10 @@ export async function POST(request: Request) {
     let finalSystemPrompt = systemPrompt({ selectedChatModel, requestHints });
 
     if (chat?.bookId) {
-        const book = await getBookById({ id: chat.bookId });
-        if (book) {
-            finalSystemPrompt = `You are an English tutor. The user has selected the book titled "${book.title}". Your conversation must be based on the content of this book. Be friendly and engaging. Ask the user questions about the content to test their understanding. Correct their grammar and provide better ways to phrase their sentences. Here is the book content for your reference:\n\n---\n\n${book.content}\n\n---\n\n${finalSystemPrompt}`;
-        }
+      const book = await getBookById({ id: chat.bookId });
+      if (book) {
+        finalSystemPrompt = `You are an English tutor. The user has selected the book titled "${book.title}". Your conversation must be based on the content of this book. Be friendly and engaging. Ask the user questions about the content to test their understanding. Correct their grammar and provide better ways to phrase their sentences. Here is the book content for your reference:\n\n---\n\n${book.content}\n\n---\n\n${finalSystemPrompt}`;
+      }
     }
 
     const streamId = generateUUID();
@@ -155,7 +158,12 @@ export async function POST(request: Request) {
           experimental_activeTools:
             selectedChatModel === 'chat-model-reasoning'
               ? []
-              : ['getWeather', 'createDocument', 'updateDocument', 'requestSuggestions'],
+              : [
+                  'getWeather',
+                  'createDocument',
+                  'updateDocument',
+                  'requestSuggestions',
+                ],
           experimental_transform: smoothStream({ chunking: 'word' }),
           experimental_generateMessageId: generateUUID,
           tools: {
@@ -189,7 +197,8 @@ export async function POST(request: Request) {
                       chatId: id,
                       role: assistantMessage.role,
                       parts: assistantMessage.parts,
-                      attachments: assistantMessage.experimental_attachments ?? [],
+                      attachments:
+                        assistantMessage.experimental_attachments ?? [],
                       createdAt: new Date(),
                     },
                   ],
@@ -232,6 +241,7 @@ export async function POST(request: Request) {
   }
 }
 
+// ... GET 和 DELETE 函数保持不变 ...
 export async function GET(request: Request) {
   const streamContext = getStreamContext();
   const resumeRequestedAt = new Date();

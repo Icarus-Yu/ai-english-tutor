@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image'; // 1. 导入 Image 组件
 import { cookies } from 'next/headers';
-import { type Book } from '@/lib/db/schema'; // 2. import type 语法修正
+import type { Book } from '@/lib/db/schema'; // 2. import type 语法修正
 import { generateUUID } from '@/lib/utils'; // 3. 导入 generateUUID
 import {
   Card,
