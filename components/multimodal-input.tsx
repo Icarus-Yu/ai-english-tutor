@@ -142,48 +142,77 @@ function PureMultimodalInput({
     chatId,
   ]);
 
+  // 新增的函数，用于发送音频
+  const sendAudioToBackend = async (audioBlob: Blob) => {
+    // 立即进入“正在识别”状态，可以给用户一个视觉反馈
+    setDialogueState('transcribing');
+    console.log("Sending audio to backend...");
+
+    const formData = new FormData();
+    // 将 Blob 对象附加到 FormData 中。
+    // 第三个参数 'recording.webm' 是必需的，因为 Blob 本身没有文件名。
+    formData.append('audio', audioBlob, 'recording.webm');
+
+    try {
+      const response = await fetch('http://localhost:5000/api/transcribe', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        console.log('Transcription successful:', result.text);
+        setInput(input + result.text); // 将识别出的文本追加到输入框
+        // 自动提交表单
+        // 注意：这里我们直接调用了 submitForm，您也可以选择让用户手动点击发送
+        handleSubmit(new Event('submit'));
+      } else {
+        console.error('Transcription failed:', result.error);
+        toast({ type: 'error', description: `Transcription failed: ${result.error}` });
+      }
+    } catch (error) {
+      console.error('Error sending audio:', error);
+      toast({ type: 'error', description: 'Could not connect to the voice service.' });
+    } finally {
+      // 无论成功与否，最终都回到空闲状态
+      setDialogueState('idle');
+    }
+  };
+
   // 4. 定义麦克风按钮的点击事件处理函数
   const handleMicClick = () => {
     if (dialogueState === 'idle') {
-      // --- 开始录音的逻辑 ---
-      navigator.mediaDevices
-        .getUserMedia({ audio: true })
-        .then((stream) => {
+      // --- 开始录音的逻辑 (这部分不变) ---
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
           const newMediaRecorder = new MediaRecorder(stream);
           mediaRecorderRef.current = newMediaRecorder;
-          audioChunksRef.current = []; // 清空之前的录音数据
+          audioChunksRef.current = [];
 
-          newMediaRecorder.ondataavailable = (event) => {
+          newMediaRecorder.ondataavailable = event => {
             audioChunksRef.current.push(event.data);
           };
 
           newMediaRecorder.onstart = () => {
-            setDialogueState('recording');
-            console.log("MediaRecorder started, state set to 'recording'");
+             setDialogueState('recording');
+             console.log("MediaRecorder started, state set to 'recording'");
           };
 
           newMediaRecorder.start();
-        })
-        .catch((err) => {
-          console.error('Error accessing microphone:', err);
-          toast({
-            type: 'error',
-            description:
-              'Could not access microphone. Please check permissions.',
-          });
-        });
-    } else if (dialogueState === 'recording') {
-      // --- 停止录音的逻辑 ---
-      if (mediaRecorderRef.current) {
-        mediaRecorderRef.current.onstop = () => {
-          // 在这里我们将处理并发送音频，但现在先重置状态
-          const audioBlob = new Blob(audioChunksRef.current, {
-            type: 'audio/webm',
-          });
-          console.log('Recording stopped, audio blob created:', audioBlob);
-          // TODO: 将 audioBlob 发送到 Python 语音服务
 
-          setDialogueState('idle'); // 暂时先重置回 idle
+        }).catch(err => {
+          console.error("Error accessing microphone:", err);
+          toast({ type: 'error', description: 'Could not access microphone. Please check permissions.' });
+        });
+
+    } else if (dialogueState === 'recording') {
+      // --- 停止录音的逻辑 (调用新函数) ---
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.onstop = () => {
+            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            // 调用新函数来处理音频发送
+            sendAudioToBackend(audioBlob);
         };
         mediaRecorderRef.current.stop();
       }
