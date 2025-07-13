@@ -2,7 +2,7 @@
 
 import type { Attachment, UIMessage } from 'ai';
 import { useChat } from '@ai-sdk/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react'; // 导入 useRef
 import useSWR, { useSWRConfig } from 'swr';
 import { ChatHeader } from '@/components/chat-header';
 import type { Vote } from '@/lib/db/schema';
@@ -20,6 +20,13 @@ import { useSearchParams } from 'next/navigation';
 import { useChatVisibility } from '@/hooks/use-chat-visibility';
 import { useAutoResume } from '@/hooks/use-auto-resume';
 import { ChatSDKError } from '@/lib/errors';
+
+export type DialogueState =
+  | 'idle'
+  | 'recording'
+  | 'transcribing'
+  | 'thinking'
+  | 'speaking';
 
 export function Chat({
   id,
@@ -41,11 +48,10 @@ export function Chat({
   const { mutate } = useSWRConfig();
   const searchParams = useSearchParams();
   const bookId = searchParams.get('bookId');
+  const [dialogueState, setDialogueState] = useState<DialogueState>('idle');
 
-  const { visibilityType } = useChatVisibility({
-    chatId: id,
-    initialVisibilityType,
-  });
+  // 【关键修复】使用 useRef 来防止 useEffect 的重复触发
+  const lastSynthesizedMessageId = useRef<string | null>(null);
 
   const {
     messages,
@@ -62,10 +68,7 @@ export function Chat({
   } = useChat({
     id,
     initialMessages,
-    body: {
-      // <--- 核心修改在这里
-      bookId: bookId ?? undefined,
-    },
+    body: { bookId: bookId ?? undefined },
     experimental_throttle: 100,
     sendExtraMessageFields: true,
     generateId: generateUUID,
@@ -75,32 +78,86 @@ export function Chat({
       message: body.messages.at(-1),
       selectedChatModel: initialChatModel,
       selectedVisibilityType: visibilityType,
-      bookId: bookId ?? undefined, // 我们在这里也保留它，以确保万无一失
+      bookId: bookId ?? undefined,
     }),
     onFinish: () => {
+      // onFinish 只负责刷新聊天历史
       mutate(unstable_serialize(getChatHistoryPaginationKey));
     },
     onError: (error) => {
       if (error instanceof ChatSDKError) {
-        toast({
-          type: 'error',
-          description: error.message,
-        });
+        toast({ type: 'error', description: error.message });
       }
     },
   });
 
-  const query = searchParams.get('query');
+  // 【关键修复】使用 useEffect 监听消息变化来触发语音合成
+  useEffect(() => {
+    // 只有在AI回复完成时（status === 'ready'）才进行处理
+    if (status === 'ready' && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
 
+      // 确保是AI的消息，且这条消息我们还没有处理过
+      if (
+        lastMessage.role === 'assistant' &&
+        lastMessage.id !== lastSynthesizedMessageId.current
+      ) {
+        // 从 parts 中提取纯文本内容
+        const textToSpeak = lastMessage.parts
+          .filter((part) => part.type === 'text')
+          .map((part) => part.text)
+          .join(' ')
+          .trim();
+
+        if (textToSpeak) {
+          // 标记这条消息已经被处理过了
+          lastSynthesizedMessageId.current = lastMessage.id;
+
+          setDialogueState('speaking');
+
+          fetch('http://localhost:5001/api/synthesize_base64', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: textToSpeak }),
+          })
+            .then((response) => response.json())
+            .then((result) => {
+              if (result.success) {
+                const audio = new Audio(
+                  `data:audio/mpeg;base64,${result.audio_base64}`,
+                );
+                audio.play();
+                audio.onended = () => {
+                  setDialogueState('idle');
+                };
+              } else {
+                toast({
+                  type: 'error',
+                  description: `语音合成失败: ${result.error}`,
+                });
+                setDialogueState('idle');
+              }
+            })
+            .catch((error) => {
+              toast({ type: 'error', description: '无法连接到语音合成服务。' });
+              setDialogueState('idle');
+            });
+        }
+      }
+    }
+  }, [messages, status]); // 依赖于 messages 和 status 变化
+
+  const { visibilityType } = useChatVisibility({
+    chatId: id,
+    initialVisibilityType,
+  });
+
+  const query = searchParams.get('query');
   const [hasAppendedQuery, setHasAppendedQuery] = useState(false);
 
   useEffect(() => {
     if (query && !hasAppendedQuery) {
-      append({
-        role: 'user',
-        content: query,
-      });
-
+      append({ role: 'user', content: query });
       setHasAppendedQuery(true);
       const newUrl = bookId ? `/chat/${id}?bookId=${bookId}` : `/chat/${id}`;
       window.history.replaceState({}, '', newUrl);
@@ -145,7 +202,7 @@ export function Chat({
           isArtifactVisible={isArtifactVisible}
         />
 
-        <form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
+        <div className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
           {!isReadonly && (
             <MultimodalInput
               chatId={id}
@@ -160,9 +217,11 @@ export function Chat({
               setMessages={setMessages}
               append={append}
               selectedVisibilityType={visibilityType}
+              dialogueState={dialogueState}
+              setDialogueState={setDialogueState}
             />
           )}
-        </form>
+        </div>
       </div>
 
       <Artifact
