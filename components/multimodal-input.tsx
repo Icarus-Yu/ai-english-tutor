@@ -27,8 +27,9 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowDown } from 'lucide-react';
 import { useScrollToBottom } from '@/hooks/use-scroll-to-bottom';
 import type { VisibilityType } from './visibility-selector';
+// 导入 DialogueState 类型
+import { DialogueState } from './chat';
 
-type DialogueState = 'idle' | 'recording' | 'transcribing' | 'thinking' | 'speaking';
 
 function PureMultimodalInput({
   chatId,
@@ -44,6 +45,9 @@ function PureMultimodalInput({
   handleSubmit,
   className,
   selectedVisibilityType,
+  // 接收状态和设置函数
+  dialogueState,
+  setDialogueState,
 }: {
   chatId: string;
   input: UseChatHelpers['input'];
@@ -58,12 +62,15 @@ function PureMultimodalInput({
   handleSubmit: UseChatHelpers['handleSubmit'];
   className?: string;
   selectedVisibilityType: VisibilityType;
+  // 定义props类型
+  dialogueState: DialogueState;
+  setDialogueState: Dispatch<SetStateAction<DialogueState>>;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const [dialogueState, setDialogueState] = useState<DialogueState>('idle');
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (textareaRef.current) adjustHeight();
@@ -107,12 +114,14 @@ function PureMultimodalInput({
   const [uploadQueue, setUploadQueue] = useState<Array<string>>([]);
 
   const submitForm = useCallback(() => {
-    window.history.replaceState({}, '', `/chat/${chatId}`);
-    handleSubmit(undefined, { experimental_attachments: attachments });
-    setAttachments([]);
-    setLocalStorageInput('');
-    resetHeight();
-    if (width && width > 768) textareaRef.current?.focus();
+    if (formRef.current) {
+        window.history.replaceState({}, '', `/chat/${chatId}`);
+        handleSubmit(new FormData(formRef.current), { experimental_attachments: attachments });
+        setAttachments([]);
+        setLocalStorageInput('');
+        resetHeight();
+        if (width && width > 768) textareaRef.current?.focus();
+    }
   }, [attachments, handleSubmit, setAttachments, setLocalStorageInput, width, chatId]);
 
   const sendAudioToBackend = async (audioBlob: Blob) => {
@@ -125,16 +134,20 @@ function PureMultimodalInput({
       const result = await response.json();
 
       if (response.ok && result.success && result.text) {
-        append({ role: 'user', content: result.text });
-        setAttachments([]);
-        setInput('');
+        setInput(result.text);
+        setTimeout(() => {
+            if (formRef.current) {
+                const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+                formRef.current.dispatchEvent(submitEvent);
+            }
+        }, 50);
       } else {
         const errorMessage = result.error || '什么都没有识别到，请再试一次。';
         toast({ type: 'error', description: errorMessage });
+        setDialogueState('idle');
       }
     } catch (error) {
       toast({ type: 'error', description: '无法连接到语音服务，请检查后端是否运行。' });
-    } finally {
       setDialogueState('idle');
     }
   };
@@ -154,7 +167,7 @@ function PureMultimodalInput({
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
         mediaRecorderRef.current.onstop = () => {
             const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-            if (audioBlob.size > 1000) { // 简单检查一下不是完全空的
+            if (audioBlob.size > 1000) {
                 sendAudioToBackend(audioBlob);
             } else {
                 toast({ type: 'error', description: '录音太短了，请再说一次。' });
@@ -166,7 +179,6 @@ function PureMultimodalInput({
     }
   };
 
-  // ... (剩余的组件渲染逻辑不变) ...
   const uploadFile = async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -203,10 +215,21 @@ function PureMultimodalInput({
     }
   }, [status, scrollToBottom]);
   const isRecording = dialogueState === 'recording';
-  const isProcessingAudio = dialogueState === 'recording' || dialogueState === 'transcribing';
+  // 【关键修改】更新禁用逻辑
+  const isMicDisabled = dialogueState !== 'idle' || status !== 'ready';
+  const isInputDisabled = dialogueState !== 'idle' || status !== 'ready';
+
+  const getPlaceholderText = () => {
+    switch (dialogueState) {
+        case 'recording': return '正在录音...';
+        case 'transcribing': return '正在识别...';
+        case 'speaking': return 'AI正在朗读...';
+        default: return '发送消息...';
+    }
+  };
 
   return (
-    <div className="relative w-full flex flex-col gap-4">
+    <form ref={formRef} onSubmit={(e) => { e.preventDefault(); submitForm(); }} className="relative w-full flex flex-col gap-4">
       <AnimatePresence>
         {!isAtBottom && (
           <motion.div
@@ -216,13 +239,7 @@ function PureMultimodalInput({
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
             className="absolute left-1/2 bottom-28 -translate-x-1/2 z-50"
           >
-            <Button
-              data-testid="scroll-to-bottom-button"
-              className="rounded-full"
-              size="icon"
-              variant="outline"
-              onClick={(event) => { event.preventDefault(); scrollToBottom(); }}
-            >
+            <Button data-testid="scroll-to-bottom-button" className="rounded-full" size="icon" variant="outline" onClick={(event) => { event.preventDefault(); scrollToBottom(); }}>
               <ArrowDown />
             </Button>
           </motion.div>
@@ -241,17 +258,14 @@ function PureMultimodalInput({
       <Textarea
         data-testid="multimodal-input"
         ref={textareaRef}
-        placeholder={
-          dialogueState === 'recording' ? '正在录音...' :
-          dialogueState === 'transcribing' ? '正在识别...' :
-          '发送消息...'
-        }
+        name="input"
+        placeholder={getPlaceholderText()}
         value={input}
         onChange={handleInput}
         className={cx('min-h-[24px] max-h-[calc(75dvh)] overflow-hidden resize-none rounded-2xl !text-base bg-muted pb-10 dark:border-zinc-700', className)}
         rows={2}
         autoFocus
-        disabled={isProcessingAudio}
+        disabled={isInputDisabled}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
             event.preventDefault();
@@ -267,36 +281,20 @@ function PureMultimodalInput({
         <AttachmentsButton fileInputRef={fileInputRef} status={status} />
       </div>
       <div className="absolute bottom-0 right-0 p-2 w-fit flex flex-row items-center gap-2">
-        <Button
-          type="button"
-          className={cx('rounded-full p-1.5 h-fit border dark:border-zinc-600', {
-            'bg-red-500 hover:bg-red-600 text-white': isRecording,
-            'animate-pulse': dialogueState === 'transcribing'
-          })}
-          onClick={handleMicClick}
-          disabled={status !== 'ready' && !isRecording}
-        >
+        <Button type="button" className={cx('rounded-full p-1.5 h-fit border dark:border-zinc-600', { 'bg-red-500 hover:bg-red-600 text-white': isRecording, 'animate-pulse': dialogueState === 'transcribing' })} onClick={handleMicClick} disabled={isMicDisabled}>
           {isRecording ? <StopIcon size={14} /> : <MicrophoneIcon size={14} />}
         </Button>
         {status === 'submitted' ? (
           <StopButton stop={stop} setMessages={setMessages} />
         ) : (
-          <SendButton input={input} submitForm={submitForm} uploadQueue={uploadQueue} disabled={isProcessingAudio} />
+          <SendButton input={input} uploadQueue={uploadQueue} disabled={isInputDisabled} />
         )}
       </div>
-    </div>
+    </form>
   );
 }
 
-// ... (memo 和其他子组件保持不变) ...
-export const MultimodalInput = memo(PureMultimodalInput, (prevProps, nextProps) => {
-    if (prevProps.input !== nextProps.input) return false;
-    if (prevProps.status !== nextProps.status) return false;
-    if (!equal(prevProps.attachments, nextProps.attachments)) return false;
-    if (prevProps.selectedVisibilityType !== nextProps.selectedVisibilityType) return false;
-    if (prevProps.dialogueState !== nextProps.dialogueState) return false;
-    return true;
-});
+export const MultimodalInput = memo(PureMultimodalInput);
 function PureAttachmentsButton({ fileInputRef, status,}: { fileInputRef: React.MutableRefObject<HTMLInputElement | null>; status: UseChatHelpers['status']; }) {
     return (<Button data-testid="attachments-button" className="rounded-md rounded-bl-lg p-[7px] h-fit dark:border-zinc-700 hover:dark:bg-zinc-900 hover:bg-zinc-200" onClick={(event) => { event.preventDefault(); fileInputRef.current?.click(); }} disabled={status !== 'ready'} variant="ghost"> <PaperclipIcon size={14} /> </Button>);
 }
@@ -305,12 +303,7 @@ function PureStopButton({ stop, setMessages,}: { stop: () => void; setMessages: 
     return (<Button data-testid="stop-button" className="rounded-full p-1.5 h-fit border dark:border-zinc-600" onClick={(event) => { event.preventDefault(); stop(); setMessages((messages) => messages); }}> <StopIcon size={14} /> </Button>);
 }
 const StopButton = memo(PureStopButton);
-function PureSendButton({ submitForm, input, uploadQueue, disabled,}: { submitForm: () => void; input: string; uploadQueue: Array<string>; disabled: boolean; }) {
-    return (<Button data-testid="send-button" className="rounded-full p-1.5 h-fit border dark:border-zinc-600" onClick={(event) => { event.preventDefault(); submitForm(); }} disabled={disabled || input.length === 0 || uploadQueue.length > 0}> <ArrowUpIcon size={14} /> </Button>);
+function PureSendButton({ input, uploadQueue, disabled,}: { input: string; uploadQueue: Array<string>; disabled: boolean; }) {
+    return (<Button type="submit" data-testid="send-button" className="rounded-full p-1.5 h-fit border dark:border-zinc-600" disabled={disabled || input.length === 0 || uploadQueue.length > 0}> <ArrowUpIcon size={14} /> </Button>);
 }
-const SendButton = memo(PureSendButton, (prevProps, nextProps) => {
-    if (prevProps.uploadQueue.length !== nextProps.uploadQueue.length) return false;
-    if (prevProps.input !== nextProps.input) return false;
-    if (prevProps.disabled !== nextProps.disabled) return false;
-    return true;
-});
+const SendButton = memo(PureSendButton);
