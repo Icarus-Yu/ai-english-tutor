@@ -27,13 +27,11 @@ export function AuthForm({
         <Input
           id="email"
           name="email"
-          className="bg-muted text-md md:text-sm"
-          type="email"
-          placeholder="user@acme.com"
-          autoComplete="email"
-          required
-          autoFocus
           defaultValue={defaultEmail}
+          required
+          autoComplete="email"
+          className="w-full px-4 py-2 rounded-lg bg-[#f5f7fa] border border-[#e5e7eb] text-[#22223b] placeholder:text-[#9ca3af] focus:outline-none focus:ring-2 focus:ring-[#7c3aed] transition"
+          placeholder="user@acme.com"
         />
       </div>
 
@@ -48,9 +46,11 @@ export function AuthForm({
         <Input
           id="password"
           name="password"
-          className="bg-muted text-md md:text-sm"
           type="password"
           required
+          autoComplete="current-password"
+          className="w-full px-4 py-2 rounded-lg bg-[#f5f7fa] border border-[#e5e7eb] text-[#22223b] placeholder:text-[#9ca3af] focus:outline-none focus:ring-2 focus:ring-[#7c3aed] transition"
+          placeholder="Password"
         />
       </div>
 
