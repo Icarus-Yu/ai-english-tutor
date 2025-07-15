@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { auth } from '../(auth)/auth';
+import { useSession } from 'next-auth/react';
 import {
   FaRegCheckCircle,
   FaRegTimesCircle,
@@ -12,8 +12,9 @@ import {
 import { toast } from '@/components/toast';
 
 export default function PlanPage() {
+  const { data: session } = useSession();
   // 邮箱（可替换为session）
-  const email = '2649643365@qq.com';
+  const email = session?.user?.email || '同学';
   const emailWidth = Math.max(120, Math.min(260, email.length * 12 + 40));
 
   // 学习目标设置

@@ -1,6 +1,8 @@
 import Link from 'next/link';
+import { auth } from '@/app/(auth)/auth';
 
-export default function ReportPage() {
+export default async function ReportPage() {
+  const session = await auth();
   // 错题和成就数据
   const wrongQuestions = [
     {
@@ -37,7 +39,7 @@ export default function ReportPage() {
     },
   ];
   // 邮箱展示，风格与dashboard一致
-  const email = '2649643365@qq.com'; // 可替换为动态session
+  const email = session?.user?.email || '同学'; // 使用 session 中的邮箱
   const emailWidth = Math.max(120, Math.min(260, email.length * 12 + 40));
   // 中文周几
   const weekDays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
