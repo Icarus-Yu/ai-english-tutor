@@ -45,20 +45,19 @@ function Toast(props: ToastProps) {
         data-testid="toast"
         key={id}
         className={cn(
-          'bg-zinc-100 p-3 rounded-lg w-full toast-mobile:w-fit flex flex-row gap-3',
+          'bg-white p-3 rounded-lg w-full toast-mobile:w-fit flex flex-row gap-3 border border-[#e5e7eb] shadow-lg',
           multiLine ? 'items-start' : 'items-center',
         )}
       >
         <div
           data-type={type}
-          className={cn(
-            'data-[type=error]:text-red-600 data-[type=success]:text-green-600',
-            { 'pt-1': multiLine },
-          )}
+          className={cn('text-[#7c3aed] flex items-center', {
+            'pt-1': multiLine,
+          })}
         >
           {iconsByType[type]}
         </div>
-        <div ref={descriptionRef} className="text-zinc-950 text-sm">
+        <div ref={descriptionRef} className="text-[#22223b] text-sm">
           {description}
         </div>
       </div>

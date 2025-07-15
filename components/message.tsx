@@ -19,6 +19,7 @@ import { MessageEditor } from './message-editor';
 import { DocumentPreview } from './document-preview';
 import { MessageReasoning } from './message-reasoning';
 import type { UseChatHelpers } from '@ai-sdk/react';
+import { format } from 'date-fns';
 
 const PurePreviewMessage = ({
   chatId,
@@ -41,6 +42,11 @@ const PurePreviewMessage = ({
 }) => {
   const [mode, setMode] = useState<'view' | 'edit'>('view');
 
+  // 格式化时间戳
+  const timeStr = message.createdAt
+    ? format(new Date(message.createdAt), 'yyyy-MM-dd HH:mm')
+    : '';
+
   return (
     <AnimatePresence>
       <motion.div
@@ -60,15 +66,15 @@ const PurePreviewMessage = ({
           )}
         >
           {message.role === 'assistant' && (
-            <div className="size-8 flex items-center rounded-full justify-center ring-1 shrink-0 ring-border bg-background">
-              <div className="translate-y-px">
-                <SparklesIcon size={14} />
+            <div className="size-8 flex items-center rounded-full justify-center ring-1 shrink-0 ring-[#7c3aed] bg-white">
+              <div className="translate-y-px text-[#7c3aed]">
+                <SparklesIcon size={16} />
               </div>
             </div>
           )}
 
           <div
-            className={cn('flex flex-col gap-4 w-full', {
+            className={cn('flex flex-col gap-2 w-full', {
               'min-h-96': message.role === 'assistant' && requiresScrollPadding,
             })}
           >
@@ -125,12 +131,27 @@ const PurePreviewMessage = ({
 
                       <div
                         data-testid="message-content"
-                        className={cn('flex flex-col gap-4', {
-                          'bg-primary text-primary-foreground px-3 py-2 rounded-xl':
+                        className={cn('flex flex-col gap-2', {
+                          // 用户消息气泡：主色amber-500背景，白字
+                          'bg-amber-500 text-white px-4 py-2 rounded-xl shadow font-medium':
                             message.role === 'user',
+                          // AI消息气泡：白底黄色边框/字体
+                          'bg-white border border-yellow-200 text-gray-800 px-4 py-2 rounded-xl shadow':
+                            message.role === 'assistant',
                         })}
                       >
                         <Markdown>{sanitizeText(part.text)}</Markdown>
+                        {/* 时间戳 */}
+                        <div
+                          className={cn('text-xs mt-1', {
+                            'text-amber-100 text-right':
+                              message.role === 'user',
+                            'text-gray-500 text-left':
+                              message.role === 'assistant',
+                          })}
+                        >
+                          {timeStr}
+                        </div>
                       </div>
                     </div>
                   );

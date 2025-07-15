@@ -20,6 +20,7 @@ import { useSearchParams } from 'next/navigation';
 import { useChatVisibility } from '@/hooks/use-chat-visibility';
 import { useAutoResume } from '@/hooks/use-auto-resume';
 import { ChatSDKError } from '@/lib/errors';
+import type { Book } from '@/lib/db/schema';
 
 export type DialogueState =
   | 'idle'
@@ -48,7 +49,40 @@ export function Chat({
   const { mutate } = useSWRConfig();
   const searchParams = useSearchParams();
   const bookId = searchParams.get('bookId');
+  const [bookTitle, setBookTitle] = useState('');
   const [dialogueState, setDialogueState] = useState<DialogueState>('idle');
+  const lastBookIdRef = useRef<string | null>(null);
+
+  // 获取书名，只在bookId变化时请求
+  useEffect(() => {
+    if (bookId && bookId !== lastBookIdRef.current) {
+      lastBookIdRef.current = bookId;
+      (async () => {
+        try {
+          const res = await fetch('/api/books');
+          if (res.ok) {
+            const books: Book[] = await res.json();
+            const book = books.find((b) => b.id === bookId);
+            if (book) setBookTitle(book.title);
+            else setBookTitle('');
+          }
+        } catch (e) {
+          setBookTitle('');
+        }
+      })();
+    }
+  }, [bookId]);
+
+  // 新建对话跳转逻辑
+  function handleNewChat() {
+    // 生成新UUID并带上当前bookId
+    const uuid = generateUUID();
+    if (bookId) {
+      window.location.href = `/chat/${uuid}?bookId=${bookId}`;
+    } else {
+      window.location.href = `/chat/${uuid}`;
+    }
+  }
 
   // 【关键修复】使用 useRef 来防止 useEffect 的重复触发
   const lastSynthesizedMessageId = useRef<string | null>(null);
@@ -76,8 +110,9 @@ export function Chat({
     experimental_prepareRequestBody: (body) => ({
       id,
       message: body.messages.at(-1),
-      selectedChatModel: initialChatModel,
-      selectedVisibilityType: visibilityType,
+      selectedChatModel: initialChatModel ?? 'chat-model',
+      selectedVisibilityType:
+        visibilityType ?? initialVisibilityType ?? 'private',
       bookId: bookId ?? undefined,
     }),
     onFinish: () => {
@@ -189,6 +224,8 @@ export function Chat({
           selectedVisibilityType={initialVisibilityType}
           isReadonly={isReadonly}
           session={session}
+          bookTitle={bookTitle}
+          onNewChat={handleNewChat}
         />
 
         <Messages

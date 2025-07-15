@@ -21,10 +21,12 @@ export function SidebarToggle({
         <Button
           data-testid="sidebar-toggle-button"
           onClick={toggleSidebar}
-          variant="outline"
-          className="md:px-2 md:h-fit"
+          variant="ghost"
+          type="button"
+          className={`bg-transparent text-[#7c3aed] hover:bg-[#f3f0ff] rounded-full p-2 ${className || ''}`}
+          aria-label="Toggle sidebar"
         >
-          <SidebarLeftIcon size={16} />
+          <SidebarLeftIcon size={20} />
         </Button>
       </TooltipTrigger>
       <TooltipContent align="start">Toggle Sidebar</TooltipContent>

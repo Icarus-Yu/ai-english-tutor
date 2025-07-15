@@ -50,26 +50,41 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#f5f7fa] to-[#e8ecf5]">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-lg px-8 py-10 flex flex-col gap-8">
-        <div className="flex flex-col items-center gap-2 text-center">
-          <h3 className="text-2xl font-bold text-[#7c3aed]">登录账号</h3>
-          <p className="text-sm text-[#4b5563]">
-            使用邮箱和密码登录智慧英语学堂
-          </p>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-yellow-50 via-amber-50 to-orange-50 p-4">
+      <div className="w-full max-w-md">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <Link href="/" className="inline-flex items-center space-x-3">
+            <div className="w-12 h-12 rounded-lg bg-amber-100 flex items-center justify-center">
+              <img
+                src="/images/logo.png"
+                alt="logo"
+                className="w-10 h-10 object-cover rounded-lg"
+              />
+            </div>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
+              智言
+            </h1>
+          </Link>
         </div>
-        <AuthForm action={handleSubmit} defaultEmail={email}>
-          <SubmitButton isSuccessful={isSuccessful}>登录</SubmitButton>
-          <p className="text-center text-sm text-[#4b5563] mt-4">
-            没有账号？{' '}
-            <Link
-              href="/register"
-              className="font-semibold text-[#7c3aed] hover:underline"
-            >
-              立即注册
-            </Link>
-          </p>
-        </AuthForm>
+        <div className="border-yellow-100 shadow-xl bg-white/90 backdrop-blur-sm rounded-2xl px-8 py-10 flex flex-col gap-8">
+          <div className="flex flex-col items-center gap-2 text-center">
+            <h3 className="text-2xl font-bold text-gray-800">登录账号</h3>
+            <p className="text-sm text-gray-600">使用邮箱和密码登录智言</p>
+          </div>
+          <AuthForm action={handleSubmit} defaultEmail={email}>
+            <SubmitButton isSuccessful={isSuccessful}>登录</SubmitButton>
+            <p className="text-center text-sm text-gray-600 mt-4">
+              没有账号？{' '}
+              <Link
+                href="/register"
+                className="font-semibold text-amber-600 hover:text-orange-600 hover:underline"
+              >
+                立即注册
+              </Link>
+            </p>
+          </AuthForm>
+        </div>
       </div>
     </div>
   );

@@ -2,91 +2,102 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useWindowSize } from 'usehooks-ts';
-
-import { ModelSelector } from '@/components/model-selector';
-import { SidebarToggle } from '@/components/sidebar-toggle';
-import { Button } from '@/components/ui/button';
-import { PlusIcon, VercelIcon } from './icons';
-import { useSidebar } from './ui/sidebar';
-import { memo } from 'react';
-import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
-import { type VisibilityType, VisibilitySelector } from './visibility-selector';
 import type { Session } from 'next-auth';
+import type { VisibilityType } from './visibility-selector';
+import { SidebarToggle } from '@/components/sidebar-toggle';
+import { ModelSelector } from '@/components/model-selector';
+import { VisibilitySelector } from '@/components/visibility-selector';
+import { PlusIcon } from './icons';
+import { Button } from './ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { useCurrentBookId } from '@/hooks/use-current-book-id';
+import { toast } from './toast';
+import { generateUUID } from '@/lib/utils';
 
-function PureChatHeader({
-  chatId,
-  selectedModelId,
-  selectedVisibilityType,
-  isReadonly,
-  session,
-}: {
+interface ChatHeaderProps {
   chatId: string;
   selectedModelId: string;
   selectedVisibilityType: VisibilityType;
   isReadonly: boolean;
   session: Session;
-}) {
-  const router = useRouter();
-  const { open } = useSidebar();
+  bookTitle: string;
+  onNewChat: () => void;
+}
 
-  const { width: windowWidth } = useWindowSize();
+export function ChatHeader({
+  chatId,
+  selectedModelId,
+  selectedVisibilityType,
+  isReadonly,
+  session,
+  bookTitle,
+  onNewChat, // 这里不再直接用 props
+}: ChatHeaderProps) {
+  const router = useRouter();
+  const bookId = useCurrentBookId();
+
+  // 统一新建对话逻辑
+  function handleNewChat() {
+    const uuid = generateUUID();
+    router.push(`/chat/${uuid}?bookId=${bookId}`);
+  }
 
   return (
-    <header className="flex sticky top-0 bg-background py-1.5 items-center px-2 md:px-2 gap-2">
-      <SidebarToggle />
-
-      {(!open || windowWidth < 768) && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              className="order-2 md:order-1 md:px-2 px-2 md:h-fit ml-auto md:ml-0"
-              onClick={() => {
-                router.push('/');
-                router.refresh();
-              }}
-            >
-              <PlusIcon />
-              <span className="md:sr-only">New Chat</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>New Chat</TooltipContent>
-        </Tooltip>
-      )}
-
+    <div className="bg-white/80 backdrop-blur-sm border-b border-yellow-100 sticky top-0 z-50 flex items-center px-6 py-4 rounded-t-2xl mb-2 gap-2">
+      {/* 左侧：侧边栏开关+返回书库 */}
+      <SidebarToggle className="bg-transparent text-amber-600 hover:bg-amber-50 rounded-full" />
+      <Link href="/books" className="ml-2 mr-4">
+        <Button
+          type="button"
+          variant="ghost"
+          className="flex items-center bg-transparent text-amber-600 font-semibold hover:bg-amber-50 rounded-full"
+        >
+          <svg
+            className="w-5 h-5 mr-1"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            viewBox="0 0 24 24"
+          >
+            <path d="M15 19l-7-7 7-7" />
+          </svg>
+          返回书库
+        </Button>
+      </Link>
+      {/* 中间：书名+副标题 */}
+      <div className="flex-1 text-center">
+        <div className="text-lg font-bold text-gray-800">{bookTitle}</div>
+        <div className="text-xs text-amber-600">AI英语对话学习</div>
+      </div>
+      {/* 右侧：新对话、模型选择、可见性选择 */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            type="button"
+            className="md:px-2 px-2 md:h-fit ml-auto md:ml-0 bg-transparent text-amber-600 hover:bg-amber-50 rounded-full"
+            onClick={handleNewChat}
+          >
+            <PlusIcon />
+            <span className="md:sr-only">New Chat</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>New Chat</TooltipContent>
+      </Tooltip>
       {!isReadonly && (
         <ModelSelector
           session={session}
           selectedModelId={selectedModelId}
-          className="order-1 md:order-2"
+          className="mx-2 text-amber-600 bg-transparent hover:bg-amber-50 rounded-full"
         />
       )}
-
       {!isReadonly && (
         <VisibilitySelector
           chatId={chatId}
           selectedVisibilityType={selectedVisibilityType}
-          className="order-1 md:order-3"
+          className="mx-2 text-amber-600 bg-transparent hover:bg-amber-50 rounded-full"
         />
       )}
-
-      <Button
-        className="bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 text-zinc-50 dark:text-zinc-900 hidden md:flex py-1.5 px-2 h-fit md:h-[34px] order-4 md:ml-auto"
-        asChild
-      >
-        <Link
-          href={`https://vercel.com/new/clone?repository-url=https://github.com/vercel/ai-chatbot&env=AUTH_SECRET&envDescription=Learn more about how to get the API Keys for the application&envLink=https://github.com/vercel/ai-chatbot/blob/main/.env.example&demo-title=AI Chatbot&demo-description=An Open-Source AI Chatbot Template Built With Next.js and the AI SDK by Vercel.&demo-url=https://chat.vercel.ai&products=[{"type":"integration","protocol":"ai","productSlug":"grok","integrationSlug":"xai"},{"type":"integration","protocol":"storage","productSlug":"neon","integrationSlug":"neon"},{"type":"integration","protocol":"storage","productSlug":"upstash-kv","integrationSlug":"upstash"},{"type":"blob"}]`}
-          target="_noblank"
-        >
-          <VercelIcon size={16} />
-          Deploy with Vercel
-        </Link>
-      </Button>
-    </header>
+    </div>
   );
 }
-
-export const ChatHeader = memo(PureChatHeader, (prevProps, nextProps) => {
-  return prevProps.selectedModelId === nextProps.selectedModelId;
-});
