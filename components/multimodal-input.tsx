@@ -151,14 +151,11 @@ function PureMultimodalInput({
         }, 50);
       } else {
         const errorMessage = result.error || '什么都没有识别到，请再试一次。';
-        toast({ type: 'error', description: errorMessage });
+        console.error('语音转录失败:', errorMessage);
         setDialogueState('idle');
       }
     } catch (error) {
-      toast({
-        type: 'error',
-        description: '无法连接到语音服务，请检查后端是否运行。',
-      });
+      console.error('无法连接到语音服务:', error);
       setDialogueState('idle');
     }
   };
@@ -257,7 +254,9 @@ function PureMultimodalInput({
   }, [status, scrollToBottom]);
   const isRecording = dialogueState === 'recording';
   // 【关键修改】更新禁用逻辑
-  const isMicDisabled = dialogueState !== 'idle' || status !== 'ready';
+  const isMicDisabled =
+    (dialogueState !== 'idle' && dialogueState !== 'recording') ||
+    status !== 'ready';
   const isInputDisabled = dialogueState !== 'idle' || status !== 'ready';
 
   const getPlaceholderText = () => {

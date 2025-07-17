@@ -166,10 +166,7 @@ export function Chat({
                   setDialogueState('idle');
                 };
               } else {
-                toast({
-                  type: 'error',
-                  description: `语音合成失败: ${result.error}`,
-                });
+                console.error(`语音合成失败: ${result.error}`);
                 setDialogueState('idle');
               }
             })
